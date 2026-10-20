@@ -14,6 +14,3 @@ Pan + Tilt Servos
   ↓ 
 Continuous Camera tracking
 ```
-
-
-
