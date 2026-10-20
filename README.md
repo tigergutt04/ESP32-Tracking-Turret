@@ -9,10 +9,11 @@ Laptop running Python + Yolo
 Target Position / Serial Movement command
   ↓ Serial USB
 ESP32 
-  ↓
+  ↓ PWM
 Pan + Tilt Servos
-  ↓
+  ↓ 
 Continuous Camera tracking
-...
+```
+
 
 
