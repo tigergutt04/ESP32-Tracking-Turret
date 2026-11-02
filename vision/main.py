@@ -1,9 +1,21 @@
 import cv2
 from ultralytics import YOLO
 import threading
+import math
 from tracking import find_target, system_error
 
 model = YOLO("yolo26n.pt")
+
+HFOV_DEG = 60.0     # Kameraets horisontale synsvinkel i grader. MÅ måles for deres kamera, dette er bare et startpunkt
+
+
+def pixel_to_angle(ex, ey, width):
+    """Gjør om system error i piksler (ex, ey) til vinkelavvik i grader (pan, tilt) med tan(theta) = e / f."""
+    # f = brennvidden i piksler: avstanden fra kameraet til bildeplanet, regnet ut fra synsvinkelen
+    f = (width / 2) / math.tan(math.radians(HFOV_DEG / 2))
+    pan_angle = math.degrees(math.atan(ex / f))     # theta = arctan(e / f)
+    tilt_angle = math.degrees(math.atan(ey / f))    # Samme f i begge retninger, siden pikslene er kvadratiske
+    return pan_angle, tilt_angle
 
 url = "http://172.20.10.12:81/stream"    # URL til ESP32 - Webserver
 
