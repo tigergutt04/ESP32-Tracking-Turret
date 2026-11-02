@@ -72,7 +72,7 @@ tracking-turret/
 │   │   └── CameraWebServer/      (Arduino sketch, copy secrets.example.h to secrets.h)
 │   │
 │   └── turret_controller/
-│       └── main.cpp
+│       └── turret_controller.ino
 │
 ├── audio/
 │

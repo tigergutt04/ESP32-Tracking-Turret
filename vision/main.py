@@ -40,11 +40,11 @@ while True:
     # classes=[0] = bare personer, imgsz=320 = mindre bilde for raskere YOLO
     results = model(frame, imgsz=320, classes=[0], verbose=False)
     h, w = frame.shape[:2]      # Gir høyde og bredde på bildet
-    target = find_target(results[0].boxes)
+    target = find_target(results[0].boxes)      # Finner målets sentrum (xt, yt), eller None
 
     if target is not None:
         xt, yt = target
-        ex, ey = system_error(xt, yt, w, h)
+        ex, ey = system_error(xt, yt, w, h)     # Regner ut avstanden fra bildets sentrum til målet
         print(int(ex), int(ey))
 
 
