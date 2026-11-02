@@ -5,7 +5,7 @@ The project is a camera-based tracking turret designed to detect and track a per
 
 An ESP32-CAM streams video to a laptop running object detection and tracking software. The tracking data is then sent to an ESP32, which controls a pan-tilt mechanism using two servo motors.
 
-When the system achieves a stable target lock, it can trigger a light indicator and play a randomly selected voice line.
+When the system achieves a stable target lock, the ESP32 plays a randomly selected voice line through a speaker.
 
 The purpose of the project is to explore computer vision, embedded systems, control, communication between devices, and mechanical design.
 
@@ -30,6 +30,7 @@ ESP32
     |
     +-- Pan Servo
     +-- Tilt Servo
+    +-- Speaker
     |
     v
 Pan-Tilt Mechanism
@@ -40,7 +41,7 @@ Pan-Tilt Mechanism
 - Laptop
 - ESP32
 - 2xServo Motors
-- Speaker
+- Speaker (driven by the turret ESP32)
 
 ## Software
 - Python
@@ -49,6 +50,7 @@ Pan-Tilt Mechanism
 - ESP32 Firmware
     - Serial Communication
     - Pan-Tilt Servo Control
+    - Voice Line Playback
 
 ## How It Works
 The ESP32-CAM streams live video to the laptop. OpenCV reads the video stream and passes the frames to YOLOv8, which detects the target.
@@ -67,7 +69,7 @@ tracking-turret/
 │
 ├── firmware/
 │   ├── esp32_cam/
-│   │   └── main.cpp
+│   │   └── CameraWebServer/      (Arduino sketch, copy secrets.example.h to secrets.h)
 │   │
 │   └── turret_controller/
 │       └── main.cpp
@@ -109,7 +111,7 @@ tracking-turret/
 ### Phase 6 - Target Lock
 - Detect when the target is centered
 - Add a target lock state
-- Trigger the light indicator and voice line
+- Play a voice line from the ESP32
 
 ### Phase 7 - Optimization
 - Reduce tracking latency
