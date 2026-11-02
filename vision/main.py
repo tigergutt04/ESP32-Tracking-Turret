@@ -6,7 +6,7 @@ from tracking import find_target, system_error
 from serial_link import connect, send_angles
 from pid import PID
 
-model = YOLO("yolov8n.pt")
+model = YOLO("yolov8n-pose.pt")     # Pose-modell: finner personer og 17 kroppspunkter (nese, øyne, skuldre ...)
 
 HFOV_DEG = 60.0     # Kameraets horisontale synsvinkel i grader. MÅ måles for deres kamera, dette er bare et startpunkt
 
@@ -70,7 +70,7 @@ while True:
     # classes=[0] = bare personer, imgsz=320 = mindre bilde for raskere YOLO, conf = minste sikkerhet
     results = model(frame, imgsz=320, classes=[0], conf=CONFIDENCE, verbose=False)
     h, w = frame.shape[:2]      # Gir høyde og bredde på bildet
-    target = find_target(results[0].boxes)      # Finner målets sentrum (xt, yt), eller None
+    target = find_target(results[0])            # Finner ansiktet (xt, yt), eller None
 
     if target is not None:
         xt, yt = target
