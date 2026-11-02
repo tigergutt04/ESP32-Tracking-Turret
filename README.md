@@ -103,8 +103,8 @@ python main.py
 |---|---|---|---|
 | `HFOV_DEG` | `vision/main.py` | 60 | Camera field of view. Must be measured for the camera |
 | `CONFIDENCE` | `vision/main.py` | 0.5 | Minimum YOLO confidence |
-| `kp`, `ki`, `kd` | `vision/main.py` | 0.5, 0, 0 | PID gains |
-| `alpha` | `vision/main.py` | 0.7 | EMA smoothing (1 = none, lower = calmer but slower) |
+| `kp`, `ki`, `kd` | `vision/main.py` | 0.4, 0, 0 | PID gains |
+| `alpha` | `vision/main.py` | 0.5 | EMA smoothing (1 = none, lower = calmer but slower) |
 | `deadzone` | `vision/main.py` | 2 deg | Errors smaller than this are ignored |
 | `PAN_DIR`, `TILT_DIR` | `vision/main.py` | -1, -1 | Flip if an axis moves the wrong way |
 | `HOME_PAN`, `HOME_TILT` | `main.py` and `.ino` | 90, 160 | Start position |

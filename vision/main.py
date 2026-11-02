@@ -16,8 +16,8 @@ PAN_DIR = -1       # Fortegn for pan-servoen (snu hvis den går feil vei)
 TILT_DIR = -1       # Fortegn for tilt-servoen (snu hvis den går feil vei)
 
 # Én PID per akse. Start med bare P, øk Ki og Kd forsiktig
-pan_pid = PID(kp=0.3, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
-tilt_pid = PID(kp=0.3, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
+pan_pid = PID(kp=0.4, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
+tilt_pid = PID(kp=0.4, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
 
 HOME_PAN, HOME_TILT = 90, 160    # Startposisjon for tårnet
 
