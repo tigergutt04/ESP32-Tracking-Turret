@@ -3,10 +3,23 @@ from ultralytics import YOLO
 import threading
 import math
 from tracking import find_target, system_error
+from serial_link import connect, send_angles
+from pid import PID
 
-model = YOLO("yolo26n.pt")
+model = YOLO("yolov8n.pt")
 
 HFOV_DEG = 60.0     # Kameraets horisontale synsvinkel i grader. MÅ måles for deres kamera, dette er bare et startpunkt
+
+CONFIDENCE = 0.5    # YOLO må være minst 50 % sikker før en person regnes som funnet
+
+PAN_DIR = -1       # Fortegn for pan-servoen (snu hvis den går feil vei)
+TILT_DIR = -1       # Fortegn for tilt-servoen (snu hvis den går feil vei)
+
+# Én PID per akse. Start med bare P, øk Ki og Kd forsiktig
+pan_pid = PID(kp=0.3, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
+tilt_pid = PID(kp=0.3, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, i_limit=10.0)
+
+HOME_PAN, HOME_TILT = 90, 160    # Startposisjon for tårnet
 
 
 def pixel_to_angle(ex, ey, width):
@@ -27,6 +40,11 @@ if not cap.isOpened():
     exit()
 
 print("Strømmen er åpnet")
+
+ser = connect()     # Serial til turret-ESP32 (COM3). Serial Monitor i Arduino IDE må være lukket
+pan, tilt = HOME_PAN, HOME_TILT  # Der servoene faktisk står (oppdateres fra ESP32). Ny vinkel = dette + korreksjon
+send_angles(ser, pan, tilt)
+print("ESP32 tilkoblet")
 
 latest = None       # Nyeste bilde fra kameraet ("postkassen"), None til første bilde kommer
 running = True      # Settes til False for å stoppe lese-tråden
@@ -49,15 +67,26 @@ while True:
         continue
     frame = latest
 
-    # classes=[0] = bare personer, imgsz=320 = mindre bilde for raskere YOLO
-    results = model(frame, imgsz=320, classes=[0], verbose=False)
+    # classes=[0] = bare personer, imgsz=320 = mindre bilde for raskere YOLO, conf = minste sikkerhet
+    results = model(frame, imgsz=320, classes=[0], conf=CONFIDENCE, verbose=False)
     h, w = frame.shape[:2]      # Gir høyde og bredde på bildet
     target = find_target(results[0].boxes)      # Finner målets sentrum (xt, yt), eller None
 
     if target is not None:
         xt, yt = target
         ex, ey = system_error(xt, yt, w, h)     # Regner ut avstanden fra bildets sentrum til målet
-        print(int(ex), int(ey))
+        pan_err, tilt_err = pixel_to_angle(ex, ey, w)   # Avstanden i grader
+
+        # PID gir korreksjonen. Målvinkel = der servoen står nå + korreksjon, holdt innenfor 0–180°
+        pan_target = min(180, max(0, pan + PAN_DIR * pan_pid.update(pan_err)))
+        tilt_target = min(180, max(0, tilt + TILT_DIR * tilt_pid.update(tilt_err)))
+        pos = send_angles(ser, pan_target, tilt_target)
+        if pos is not None:
+            pan, tilt = pos     # Bruk ekte posisjon neste gang, så målet ikke løper fra servoen
+        print(f"feil: {pan_err:+.1f}°, {tilt_err:+.1f}°  ->  mål: {pan_target:.0f}, {tilt_target:.0f}  står: {pan:.1f}, {tilt:.1f}")
+    else:
+        pan_pid.reset()     # Ingen mål: glem gammel feil, så et nytt mål ikke arver den
+        tilt_pid.reset()
 
 
     frame = results[0].plot()   # Tegner YOLO-boksene. Vår egen tegning må komme etter, ellers males den over
@@ -81,4 +110,6 @@ while True:
 running = False
 reader.join(timeout=2)      # Vent til tråden er ferdig (maks 2 s hvis strømmen henger)
 cap.release()
+send_angles(ser, HOME_PAN, HOME_TILT)    # Sett tårnet tilbake i startposisjon før vi avslutter
+ser.close()
 cv2.destroyAllWindows()
