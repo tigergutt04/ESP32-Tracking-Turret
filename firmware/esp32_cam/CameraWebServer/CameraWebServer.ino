@@ -90,7 +90,7 @@ void setup() {
   }
   // drop down frame size for higher initial frame rate
   if (config.pixel_format == PIXFORMAT_JPEG) {
-    s->set_framesize(s, FRAMESIZE_320X320);  // square, matches YOLO imgsz=320; crops the sides of the image
+    s->set_framesize(s, FRAMESIZE_QVGA);  // 320x240: full sensor width (wider view than 320x320)
   }
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
