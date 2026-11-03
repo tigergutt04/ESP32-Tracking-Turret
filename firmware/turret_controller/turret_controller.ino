@@ -7,8 +7,10 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 const int PAN_CH = 0;       // Pan-servo (venstre/høyre) på kanal 0
 const int TILT_CH = 1;      // Tilt-servo (opp/ned) på kanal 1
 
-// Servo-signal: 50 Hz, pulsbredde 1000–2000 µs = 0–180°
+// Servo-signal: 50 Hz, pulsbredde 500–2500 µs = 0–180°
 const int SERVO_FREQ = 50;
+const float PULSE_MIN = 500.0;      // µs ved 0°. Juster hvis servoen summer mot endestoppet
+const float PULSE_MAX = 2500.0;     // µs ved 180°
 
 // Fartsgrense: servoene glir mot målvinkelen i stedet for å hoppe
 const float MAX_SPEED = 150.0;      // Maks fart i grader per sekund
@@ -16,7 +18,7 @@ const int STEP_MS = 20;             // Oppdaterer servoene hvert 20. ms (samme s
 
 // Startposisjon (samme som HOME i main.py)
 const float HOME_PAN = 90.0;
-const float HOME_TILT = 160.0;
+const float HOME_TILT = 130.0;
 
 float panNow = HOME_PAN, tiltNow = HOME_TILT;           // Der servoene står nå
 float panTarget = HOME_PAN, tiltTarget = HOME_TILT;     // Der Python vil at de skal stå
@@ -24,7 +26,7 @@ unsigned long lastStep = 0;                             // Tidspunkt (ms) for fo
 
 // Setter servoen på en PCA9685-kanal til en vinkel (0 - 180). float gir finere steg enn hele grader
 void setServo(int channel, float angle) {
-  float pulse_us = 1000.0 + angle / 180.0 * 1000.0;   // Vinkel -> pulsbredde
+  float pulse_us = PULSE_MIN + angle / 180.0 * (PULSE_MAX - PULSE_MIN);   // Vinkel -> pulsbredde
   pwm.writeMicroseconds(channel, pulse_us);           // PCA9685 lager selve PWM-signalet
 }
 

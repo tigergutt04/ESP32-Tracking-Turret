@@ -1,5 +1,5 @@
 FACE_POINTS = [0, 1, 2, 3, 4]     # Pose-punkter i ansiktet: nese, venstre/høyre øye, venstre/høyre øre
-POINT_CONF = 0.5                  # Et punkt må være minst 50 % sikkert for å brukes
+POINT_CONF = 0.5                  # Summen av sikkerheten til ansiktspunktene må være over dette, ellers brukes boksen
 
 
 def find_target(result):
@@ -11,18 +11,15 @@ def find_target(result):
     points = result.keypoints.xy[0].tolist()
     confs = result.keypoints.conf[0].tolist() if result.keypoints.conf is not None else [0] * len(points)
 
-    # 1. Nesen, hvis den synes
-    if confs[0] > POINT_CONF:
-        return points[0][0], points[0][1]
-
-    # 2. Ellers gjennomsnittet av øyne og ører som synes (f.eks. når personen snur seg)
-    visible = [points[i] for i in FACE_POINTS if confs[i] > POINT_CONF]
-    if visible:
-        xt = sum(p[0] for p in visible) / len(visible)
-        yt = sum(p[1] for p in visible) / len(visible)
+    # 1. Vektet snitt av nese, øyne og ører: et punkt teller like mye som YOLO er sikker på det.
+    # Ingen hard grense mellom "nese" og "øyne", så målet glir i stedet for å hoppe når nesa blir usikker
+    total = sum(confs[i] for i in FACE_POINTS)
+    if total > POINT_CONF:
+        xt = sum(points[i][0] * confs[i] for i in FACE_POINTS) / total
+        yt = sum(points[i][1] * confs[i] for i in FACE_POINTS) / total
         return xt, yt
 
-    # 3. Ellers øvre del av boksen, der hodet som regel er
+    # 2. Ellers øvre del av boksen, der hodet som regel er
     # xyxy = hjørnene på boksen: (x1, y1) øverst til venstre, (x2, y2) nederst til høyre
     x1, y1, x2, y2 = result.boxes.xyxy[0].tolist()
     xt = (x1 + x2) / 2              # Midt på i bredden

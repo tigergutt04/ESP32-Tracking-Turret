@@ -1,6 +1,7 @@
 import cv2
 from ultralytics import YOLO
 import threading
+import time
 import math
 from tracking import find_target, system_error
 from serial_link import connect, send_angles
@@ -16,10 +17,11 @@ PAN_DIR = -1       # Fortegn for pan-servoen (snu hvis den går feil vei)
 TILT_DIR = -1       # Fortegn for tilt-servoen (snu hvis den går feil vei)
 
 # Én PID per akse. Start med bare P, øk Ki og Kd forsiktig
-pan_pid = PID(kp=0.4, ki=0.0, kd=0.0, alpha=0.5, deadzone=3.0, i_limit=10.0)
-tilt_pid = PID(kp=0.4, ki=0.0, kd=0.0, alpha=0.5, deadzone=3.0, i_limit=10.0)
+# Kp 0.25: kamerastrømmen henger noen bilder etter, og høyere Kp skyter over når målet bygger på forrige mål
+pan_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=4.0, stop_zone=1.5, i_limit=10.0)
+tilt_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=4.0, stop_zone=1.5, i_limit=10.0)
 
-HOME_PAN, HOME_TILT = 90, 160    # Startposisjon for tårnet
+HOME_PAN, HOME_TILT = 90, 130    # Startposisjon for tårnet
 
 
 def pixel_to_angle(ex, ey, width):
@@ -42,7 +44,7 @@ if not cap.isOpened():
 print("Strømmen er åpnet")
 
 ser = connect()     # Serial til turret-ESP32 (COM3). Serial Monitor i Arduino IDE må være lukket
-pan, tilt = HOME_PAN, HOME_TILT  # Der servoene faktisk står (oppdateres fra ESP32). Ny vinkel = dette + korreksjon
+pan, tilt = HOME_PAN, HOME_TILT  # Forrige mål sendt til servoene. Ny vinkel = dette + korreksjon
 send_angles(ser, pan, tilt)
 print("ESP32 tilkoblet")
 
@@ -62,10 +64,15 @@ def read_frames():
 reader = threading.Thread(target=read_frames, daemon=True)
 reader.start()
 
+prev = None         # Forrige bilde vi behandlet
+
 while True:
-    if latest is None:
+    # Vent på et nytt bilde. cap.read() lager et nytt objekt hver gang, så "is" ser om bildet er byttet
+    # Uten dette regnet PID-en korreksjon flere ganger på samme gamle feil -> rykk og overskyting
+    if latest is None or latest is prev:
+        time.sleep(0.001)   # Kort pause, så ventingen ikke tar CPU fra lese-tråden
         continue
-    frame = latest
+    frame = prev = latest
 
     # classes=[0] = bare personer, imgsz=320 = mindre bilde for raskere YOLO, conf = minste sikkerhet
     results = model(frame, imgsz=320, classes=[0], conf=CONFIDENCE, verbose=False)
@@ -77,13 +84,18 @@ while True:
         ex, ey = system_error(xt, yt, w, h)     # Regner ut avstanden fra bildets sentrum til målet
         pan_err, tilt_err = pixel_to_angle(ex, ey, w)   # Avstanden i grader
 
-        # PID gir korreksjonen. Målvinkel = der servoen står nå + korreksjon, holdt innenfor 0–180°
-        pan_target = min(180, max(0, pan + PAN_DIR * pan_pid.update(pan_err)))
-        tilt_target = min(180, max(0, tilt + TILT_DIR * tilt_pid.update(tilt_err)))
-        pos = send_angles(ser, pan_target, tilt_target)
-        if pos is not None:
-            pan, tilt = pos     # Bruk ekte posisjon neste gang, så målet ikke løper fra servoen
-        print(f"feil: {pan_err:+.1f}°, {tilt_err:+.1f}°  ->  mål: {pan_target:.0f}, {tilt_target:.0f}  står: {pan:.1f}, {tilt:.1f}")
+        # PID gir korreksjonen (0 i dødsonen)
+        pan_u = PAN_DIR * pan_pid.update(pan_err)
+        tilt_u = TILT_DIR * tilt_pid.update(tilt_err)
+
+        if pan_u != 0 or tilt_u != 0:     # I dødsonen: ingenting å sende, servoene blir stående
+            # Målvinkel = forrige mål + korreksjon, holdt innenfor 0–180°
+            pan_target = min(180, max(0, pan + pan_u))
+            tilt_target = min(180, max(0, tilt + tilt_u))
+            pos = send_angles(ser, pan_target, tilt_target)     # Der servoen står, (pan, tilt) eller None
+            # Bygg på målet, ikke POS-svaret: svaret er én runde gammelt og ga sikksakk mellom to mål
+            pan, tilt = pan_target, tilt_target
+            print(f"feil: {pan_err:+.1f}°, {tilt_err:+.1f}°  ->  mål: {pan_target:.0f}, {tilt_target:.0f}  står: {pos}")
     else:
         pan_pid.reset()     # Ingen mål: glem gammel feil, så et nytt mål ikke arver den
         tilt_pid.reset()

@@ -72,7 +72,7 @@ Pan-Tilt Mechanism
 ## How It Works
 1. **Video:** The ESP32-CAM streams 320x240 JPEG video over WiFi. A background thread in Python reads the stream and keeps only the newest frame, so no frames queue up and the latency stays low.
 2. **Detection:** YOLOv8n-pose finds the person (confidence >= 50 %) and 17 body keypoints.
-3. **Target:** `find_target` aims at the nose. If the nose is not visible it uses the visible eyes/ears, and otherwise a point 15 % below the top of the bounding box.
+3. **Target:** `find_target` aims at a confidence-weighted average of the nose, eyes and ears, so the target glides instead of jumping when one point becomes uncertain. If no face points are found it uses a point 15 % below the top of the bounding box.
 4. **System error:** `system_error` computes the offset between the image centre and the target:
 
    e_x = x_c - x_t,  e_y = y_c - y_t
@@ -83,11 +83,11 @@ Pan-Tilt Mechanism
 
 6. **PID:** One PID controller per axis turns the angle error into a correction:
     - EMA smoothing: e_s = alpha * e + (1 - alpha) * e_s,prev
-    - Deadzone: errors smaller than the deadzone are ignored, so the turret stands still
+    - Deadzone with hysteresis: a standing axis starts moving when the error exceeds `deadzone`, and a moving axis stops when the error drops below `stop_zone`
     - PID: u = Kp * e_s + Ki * sum(e_s * dt) + Kd * (e_s - e_s,prev) / dt
     - Anti-windup: the integral is limited, and everything resets when the target is lost
-7. **Serial:** The new target angle (real servo position + correction) is sent to the ESP32 as `pan,tilt\n`. The ESP32 replies with the real servo position `POS pan,tilt`, which Python uses as the base for the next correction.
-8. **Servos:** The ESP32 moves the servos towards the target angle in 20 ms steps with a maximum speed (150 deg/s), so the movement is smooth even though new angles only arrive a few times per second. Each step is sent over I2C to the PCA9685, which generates the 50 Hz servo signal (1000–2000 µs = 0–180°).
+7. **Serial:** The new target angle (previous target + correction) is sent to the ESP32 as `pan,tilt\n`. Nothing is sent while both axes are in the deadzone. The ESP32 replies with `POS pan,tilt`, which is only printed: it is one round old, and using it as the base made the target zig-zag.
+8. **Servos:** The ESP32 moves the servos towards the target angle in 20 ms steps with a maximum speed (150 deg/s), so the movement is smooth even though new angles only arrive a few times per second. Each step is sent over I2C to the PCA9685, which generates the 50 Hz servo signal (500–2500 µs = 0–180°).
 
 ## Setup
 
@@ -101,7 +101,7 @@ Pan-Tilt Mechanism
 1. Install **Adafruit PWM Servo Driver Library** in the Arduino Library Manager.
 2. Open `firmware/turret_controller/turret_controller.ino` in Arduino IDE.
 3. Board: **ESP32 Dev Module**. Upload.
-4. Test in Serial Monitor (115200 baud, "New Line"): type `90,160` and press Enter.
+4. Test in Serial Monitor (115200 baud, "New Line"): type `90,130` and press Enter.
 
 ### Python
 ```text
@@ -111,7 +111,7 @@ python main.py
 ```
 - Set the camera URL at the top of `main.py` and the serial port in `serial_link.py` (default `COM3`).
 - Close the Serial Monitor and the camera page in the browser before running.
-- Press `q` in the video window to quit. The turret returns to its start position (90, 160).
+- Press `q` in the video window to quit. The turret returns to its start position (90, 130).
 - `python serial_link.py` moves the servos without camera and YOLO. `python pid.py` tests the PID math.
 
 ## Tuning
@@ -119,11 +119,11 @@ python main.py
 |---|---|---|---|
 | `HFOV_DEG` | `vision/main.py` | 50 | Camera field of view. Must be measured for the camera |
 | `CONFIDENCE` | `vision/main.py` | 0.5 | Minimum YOLO confidence |
-| `kp`, `ki`, `kd` | `vision/main.py` | 0.4, 0, 0 | PID gains |
+| `kp`, `ki`, `kd` | `vision/main.py` | 0.25, 0, 0 | PID gains |
 | `alpha` | `vision/main.py` | 0.5 | EMA smoothing (1 = none, lower = calmer but slower) |
-| `deadzone` | `vision/main.py` | 3 deg | Errors smaller than this are ignored |
+| `deadzone`, `stop_zone` | `vision/main.py` | 4, 1.5 deg | Start moving above `deadzone`, stop below `stop_zone` |
 | `PAN_DIR`, `TILT_DIR` | `vision/main.py` | -1, -1 | Flip if an axis moves the wrong way |
-| `HOME_PAN`, `HOME_TILT` | `main.py` and `.ino` | 90, 160 | Start position |
+| `HOME_PAN`, `HOME_TILT` | `main.py` and `.ino` | 90, 130 | Start position |
 | `MAX_SPEED` | `turret_controller.ino` | 150 deg/s | Maximum servo speed |
 
 Because the correction is added to the current angle, the P term already acts partly like an integrator. Increase `ki` carefully to avoid overshoot.
