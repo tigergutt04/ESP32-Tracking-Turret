@@ -1,5 +1,11 @@
+import math
+
 FACE_POINTS = [0, 1, 2, 3, 4]     # Pose-punkter i ansiktet: nese, venstre/høyre øye, venstre/høyre øre
 POINT_CONF = 0.5                  # Summen av sikkerheten til ansiktspunktene må være over dette, ellers brukes boksen
+
+AIM_BELOW_CM = 30.0     # Sikter så mange cm under hodet
+SHOULDER_CM = 40.0      # Omtrentlig skulderbredde på en voksen, brukes som målestokk for cm -> piksler
+L_SHOULDER, R_SHOULDER = 5, 6     # Pose-punktene for venstre og høyre skulder
 
 
 def find_target(result):
@@ -17,6 +23,12 @@ def find_target(result):
     if total > POINT_CONF:
         xt = sum(points[i][0] * confs[i] for i in FACE_POINTS) / total
         yt = sum(points[i][1] * confs[i] for i in FACE_POINTS) / total
+
+        # Flytt målet AIM_BELOW_CM ned. Skulderbredden i piksler sier hvor mange piksler en cm er på denne avstanden.
+        # Synes ikke begge skuldrene, siktes det rett på hodet
+        if confs[L_SHOULDER] > POINT_CONF and confs[R_SHOULDER] > POINT_CONF:
+            shoulder_px = math.dist(points[L_SHOULDER], points[R_SHOULDER])     # Avstand mellom skuldrene i piksler
+            yt += AIM_BELOW_CM * shoulder_px / SHOULDER_CM     # y-aksen peker nedover, så + er ned
         return xt, yt
 
     # 2. Ellers øvre del av boksen, der hodet som regel er
