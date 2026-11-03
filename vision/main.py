@@ -18,8 +18,8 @@ TILT_DIR = -1       # Fortegn for tilt-servoen (snu hvis den går feil vei)
 
 # Én PID per akse. Start med bare P, øk Ki og Kd forsiktig
 # Kp 0.25: kamerastrømmen henger noen bilder etter, og høyere Kp skyter over når målet bygger på forrige mål
-pan_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=4.0, stop_zone=1.5, i_limit=10.0)
-tilt_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=4.0, stop_zone=1.5, i_limit=10.0)
+pan_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, stop_zone=0.75, i_limit=10.0)
+tilt_pid = PID(kp=0.25, ki=0.0, kd=0.0, alpha=0.5, deadzone=2.0, stop_zone=0.75, i_limit=10.0)
 
 HOME_PAN, HOME_TILT = 90, 130    # Startposisjon for tårnet
 

@@ -72,7 +72,7 @@ Pan-Tilt Mechanism
 ## How It Works
 1. **Video:** The ESP32-CAM streams 320x240 JPEG video over WiFi. A background thread in Python reads the stream and keeps only the newest frame, so no frames queue up and the latency stays low.
 2. **Detection:** YOLOv8n-pose finds the person (confidence >= 50 %) and 17 body keypoints.
-3. **Target:** `find_target` aims at a confidence-weighted average of the nose, eyes and ears, so the target glides instead of jumping when one point becomes uncertain. When both shoulders are visible the target is moved `AIM_BELOW_CM` (30 cm) down, using the shoulder width (about 40 cm) as the scale from cm to pixels. If no face points are found it uses a point 15 % below the top of the bounding box.
+3. **Target:** `find_target` aims at a confidence-weighted average of the nose, eyes and ears, so the target glides instead of jumping when one point becomes uncertain. When both shoulders are visible the target is moved `AIM_BELOW_CM` (20 cm) down and `AIM_RIGHT_CM` (20 cm) right, using the shoulder width (about 30 cm) as the scale from cm to pixels. If no face points are found it uses a point 15 % below the top of the bounding box.
 4. **System error:** `system_error` computes the offset between the image centre and the target:
 
    e_x = x_c - x_t,  e_y = y_c - y_t
@@ -121,7 +121,7 @@ python main.py
 | `CONFIDENCE` | `vision/main.py` | 0.5 | Minimum YOLO confidence |
 | `kp`, `ki`, `kd` | `vision/main.py` | 0.25, 0, 0 | PID gains |
 | `alpha` | `vision/main.py` | 0.5 | EMA smoothing (1 = none, lower = calmer but slower) |
-| `deadzone`, `stop_zone` | `vision/main.py` | 4, 1.5 deg | Start moving above `deadzone`, stop below `stop_zone` |
+| `deadzone`, `stop_zone` | `vision/main.py` | 2, 0.75 deg | Start moving above `deadzone`, stop below `stop_zone` |
 | `PAN_DIR`, `TILT_DIR` | `vision/main.py` | -1, -1 | Flip if an axis moves the wrong way |
 | `HOME_PAN`, `HOME_TILT` | `main.py` and `.ino` | 90, 130 | Start position |
 | `MAX_SPEED` | `turret_controller.ino` | 150 deg/s | Maximum servo speed |

@@ -3,8 +3,9 @@ import math
 FACE_POINTS = [0, 1, 2, 3, 4]     # Pose-punkter i ansiktet: nese, venstre/høyre øye, venstre/høyre øre
 POINT_CONF = 0.5                  # Summen av sikkerheten til ansiktspunktene må være over dette, ellers brukes boksen
 
-AIM_BELOW_CM = 30.0     # Sikter så mange cm under hodet
-SHOULDER_CM = 40.0      # Omtrentlig skulderbredde på en voksen, brukes som målestokk for cm -> piksler
+AIM_BELOW_CM = 20.0     # Sikter så mange cm under hodet
+AIM_RIGHT_CM = 20.0      # Sikter så mange cm til høyre (sett fra kameraet). Negativ = til venstre
+SHOULDER_CM = 30.0      # Omtrentlig skulderbredde på en voksen, brukes som målestokk for cm -> piksler
 L_SHOULDER, R_SHOULDER = 5, 6     # Pose-punktene for venstre og høyre skulder
 
 
@@ -24,11 +25,13 @@ def find_target(result):
         xt = sum(points[i][0] * confs[i] for i in FACE_POINTS) / total
         yt = sum(points[i][1] * confs[i] for i in FACE_POINTS) / total
 
-        # Flytt målet AIM_BELOW_CM ned. Skulderbredden i piksler sier hvor mange piksler en cm er på denne avstanden.
-        # Synes ikke begge skuldrene, siktes det rett på hodet
+        # Flytt målet AIM_BELOW_CM ned og AIM_RIGHT_CM til høyre. Skulderbredden i piksler sier hvor mange piksler
+        # en cm er på denne avstanden. Synes ikke begge skuldrene, siktes det rett på hodet
         if confs[L_SHOULDER] > POINT_CONF and confs[R_SHOULDER] > POINT_CONF:
             shoulder_px = math.dist(points[L_SHOULDER], points[R_SHOULDER])     # Avstand mellom skuldrene i piksler
-            yt += AIM_BELOW_CM * shoulder_px / SHOULDER_CM     # y-aksen peker nedover, så + er ned
+            px_per_cm = shoulder_px / SHOULDER_CM
+            yt += AIM_BELOW_CM * px_per_cm     # y-aksen peker nedover, så + er ned
+            xt += AIM_RIGHT_CM * px_per_cm     # x-aksen peker mot høyre i bildet
         return xt, yt
 
     # 2. Ellers øvre del av boksen, der hodet som regel er
