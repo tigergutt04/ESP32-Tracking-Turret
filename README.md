@@ -190,3 +190,4 @@ tracking-turret/
 ## Acknowledgements
 - [mmm1712/ESP32-CAM-AI-Object-Tracking](https://github.com/mmm1712/ESP32-CAM-AI-Object-Tracking) was used as a reference for the latest-frame reader, EMA smoothing and deadzone ideas.
 - The ESP32-CAM firmware is based on the Espressif `CameraWebServer` example.
+- Claude (Anthropic) was used to write code. I decided which functions and methods to use and how they should work.
