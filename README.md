@@ -5,8 +5,6 @@ The project is a camera-based tracking turret designed to detect and track a per
 
 An ESP32-CAM streams video to a laptop running object detection and tracking software. The tracking data is then sent to an ESP32, which controls a pan-tilt mechanism using two servo motors.
 
-When the system achieves a stable target lock, the ESP32 plays a randomly selected voice line through a speaker.
-
 The purpose of the project is to explore computer vision, embedded systems, control, communication between devices, and mechanical design.
 
 ## Goals
@@ -28,9 +26,14 @@ Laptop
     v
 ESP32
     |
-    +-- Pan Servo  (GPIO25)
-    +-- Tilt Servo (GPIO33)
     +-- Speaker
+    |
+    | I2C (SDA = GPIO21, SCL = GPIO22)
+    v
+PCA9685 Servo Controller  <--  External 5 V supply (V+)
+    |
+    +-- Pan Servo  (channel 0)
+    +-- Tilt Servo (channel 1)
     |
     v
 Pan-Tilt Mechanism
@@ -39,9 +42,21 @@ Pan-Tilt Mechanism
 ## Hardware
 - ESP32-CAM (AI Thinker, OV3660)
 - Laptop
-- ESP32
-- 2x Servo Motors (pan on GPIO25, tilt on GPIO33)
+- ESP32 (ESP32-WROOM-32)
+- PCA9685 16-channel servo controller (I2C address 0x40)
+- External 5 V power supply for the servos
+- 2x Servo Motors (pan on PCA9685 channel 0, tilt on channel 1)
 - Speaker (driven by the turret ESP32)
+
+### Wiring
+| From | To | Note |
+|---|---|---|
+| ESP32 GPIO21 | PCA9685 SDA | I2C data |
+| ESP32 GPIO22 | PCA9685 SCL | I2C clock |
+| ESP32 3V3 | PCA9685 VCC | Logic power. Use 3.3 V, the ESP32 pins are not 5 V tolerant |
+| ESP32 GND | PCA9685 GND | Common ground is required |
+| External 5 V + / − | PCA9685 screw terminal V+ / GND | Servo power. Do not connect ESP32 5V to V+ |
+| Pan / tilt servo | PCA9685 channel 0 / 1 | |
 
 ## Software
 - Python
@@ -51,7 +66,7 @@ Pan-Tilt Mechanism
 - ESP32 Firmware (Arduino)
     - Camera web server (ESP32-CAM)
     - Serial Communication
-    - Pan-Tilt Servo Control with speed limit
+    - Pan-Tilt Servo Control via PCA9685 with speed limit (Adafruit PWM Servo Driver Library)
     - Voice Line Playback
 
 ## How It Works
@@ -72,7 +87,7 @@ Pan-Tilt Mechanism
     - PID: u = Kp * e_s + Ki * sum(e_s * dt) + Kd * (e_s - e_s,prev) / dt
     - Anti-windup: the integral is limited, and everything resets when the target is lost
 7. **Serial:** The new target angle (real servo position + correction) is sent to the ESP32 as `pan,tilt\n`. The ESP32 replies with the real servo position `POS pan,tilt`, which Python uses as the base for the next correction.
-8. **Servos:** The ESP32 moves the servos towards the target angle in 20 ms steps with a maximum speed (150 deg/s), so the movement is smooth even though new angles only arrive a few times per second.
+8. **Servos:** The ESP32 moves the servos towards the target angle in 20 ms steps with a maximum speed (150 deg/s), so the movement is smooth even though new angles only arrive a few times per second. Each step is sent over I2C to the PCA9685, which generates the 50 Hz servo signal (1000–2000 µs = 0–180°).
 
 ## Setup
 
@@ -83,9 +98,10 @@ Pan-Tilt Mechanism
 4. The Serial Monitor (115200 baud) shows the camera's IP address. The laptop must be on the same WiFi network.
 
 ### Turret ESP32
-1. Open `firmware/turret_controller/turret_controller.ino` in Arduino IDE.
-2. Board: **ESP32 Dev Module**. Upload.
-3. Test in Serial Monitor (115200 baud, "New Line"): type `90,160` and press Enter.
+1. Install **Adafruit PWM Servo Driver Library** in the Arduino Library Manager.
+2. Open `firmware/turret_controller/turret_controller.ino` in Arduino IDE.
+3. Board: **ESP32 Dev Module**. Upload.
+4. Test in Serial Monitor (115200 baud, "New Line"): type `90,160` and press Enter.
 
 ### Python
 ```text
@@ -101,11 +117,11 @@ python main.py
 ## Tuning
 | Setting | File | Value | Effect |
 |---|---|---|---|
-| `HFOV_DEG` | `vision/main.py` | 60 | Camera field of view. Must be measured for the camera |
+| `HFOV_DEG` | `vision/main.py` | 50 | Camera field of view. Must be measured for the camera |
 | `CONFIDENCE` | `vision/main.py` | 0.5 | Minimum YOLO confidence |
 | `kp`, `ki`, `kd` | `vision/main.py` | 0.4, 0, 0 | PID gains |
 | `alpha` | `vision/main.py` | 0.5 | EMA smoothing (1 = none, lower = calmer but slower) |
-| `deadzone` | `vision/main.py` | 2 deg | Errors smaller than this are ignored |
+| `deadzone` | `vision/main.py` | 3 deg | Errors smaller than this are ignored |
 | `PAN_DIR`, `TILT_DIR` | `vision/main.py` | -1, -1 | Flip if an axis moves the wrong way |
 | `HOME_PAN`, `HOME_TILT` | `main.py` and `.ino` | 90, 160 | Start position |
 | `MAX_SPEED` | `turret_controller.ino` | 150 deg/s | Maximum servo speed |
@@ -166,12 +182,7 @@ tracking-turret/
 - Make the turret follow the detected target
 - Improve tracking speed and stability (PID, EMA, deadzone, speed limit)
 
-### Phase 6 - Target Lock
-- Detect when the target is centered
-- Add a target lock state
-- Play a voice line from the ESP32
-
-### Phase 7 - Optimization
+### Phase 6 - Optimization
 - Reduce tracking latency
 - Improve movement smoothness
 - Tune the tracking and servo control

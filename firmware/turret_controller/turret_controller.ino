@@ -1,9 +1,14 @@
-const int PAN_PIN = 25;     // Pan-servo (venstre/høyre)
-const int TILT_PIN = 33;    // Tilt-servo (opp/ned)
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
+// PCA9685 servo-kontroller over I2C (SDA = GPIO21, SCL = GPIO22, adresse 0x40)
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
+
+const int PAN_CH = 0;       // Pan-servo (venstre/høyre) på kanal 0
+const int TILT_CH = 1;      // Tilt-servo (opp/ned) på kanal 1
 
 // Servo-signal: 50 Hz, pulsbredde 1000–2000 µs = 0–180°
 const int SERVO_FREQ = 50;
-const int SERVO_RESOLUTION = 14;    // 14 bit: 0–16383 tilsvarer én periode på 20 ms
 
 // Fartsgrense: servoene glir mot målvinkelen i stedet for å hoppe
 const float MAX_SPEED = 150.0;      // Maks fart i grader per sekund
@@ -17,11 +22,10 @@ float panNow = HOME_PAN, tiltNow = HOME_TILT;           // Der servoene står n�
 float panTarget = HOME_PAN, tiltTarget = HOME_TILT;     // Der Python vil at de skal stå
 unsigned long lastStep = 0;                             // Tidspunkt (ms) for forrige oppdatering
 
-// Setter servoen på en pinne til en vinkel (0 - 180). float gir finere steg enn hele grader
-void setServo(int pin, float angle) {
+// Setter servoen på en PCA9685-kanal til en vinkel (0 - 180). float gir finere steg enn hele grader
+void setServo(int channel, float angle) {
   float pulse_us = 1000.0 + angle / 180.0 * 1000.0;   // Vinkel -> pulsbredde
-  int duty = pulse_us * 16383.0 / 20000.0;            // Pulsbredde -> PWM-verdi
-  ledcWrite(pin, duty);
+  pwm.writeMicroseconds(channel, pulse_us);           // PCA9685 lager selve PWM-signalet
 }
 
 // Flytter "now" mot "target", men aldri mer enn maxStep. Gir tilbake ny posisjon
@@ -37,11 +41,12 @@ void setup() {
   Serial.begin(115200);       // Samme hastighet må brukes i Python og Serial Monitor
   Serial.setTimeout(50);      // Ikke vent mer enn 50 ms på resten av en linje
 
-  ledcAttach(PAN_PIN, SERVO_FREQ, SERVO_RESOLUTION);     // Kobler PWM-signal til pan-pinnen
-  ledcAttach(TILT_PIN, SERVO_FREQ, SERVO_RESOLUTION);    // Kobler PWM-signal til tilt-pinnen
+  pwm.begin();                          // Starter I2C og PCA9685
+  pwm.setOscillatorFrequency(27000000); // Klokka på PCA9685-brettet, trengs for riktig pulsbredde
+  pwm.setPWMFreq(SERVO_FREQ);           // 50 Hz servo-signal
 
-  setServo(PAN_PIN, panNow);
-  setServo(TILT_PIN, tiltNow);
+  setServo(PAN_CH, panNow);
+  setServo(TILT_CH, tiltNow);
 }
 
 // Kjører om og om igjen: leser nye målvinkler og flytter servoene jevnt mot dem
@@ -70,7 +75,7 @@ void loop() {
 
     panNow = stepToward(panNow, panTarget, maxStep);
     tiltNow = stepToward(tiltNow, tiltTarget, maxStep);
-    setServo(PAN_PIN, panNow);
-    setServo(TILT_PIN, tiltNow);
+    setServo(PAN_CH, panNow);
+    setServo(TILT_CH, tiltNow);
   }
 }
